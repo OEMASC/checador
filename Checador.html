@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Checador OEMASC - Versión Simplificada</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding: 2em; }
+    input, button { font-size: 1rem; padding: 0.5em; margin: 1em; width: 250px; }
+    #mensaje { margin-top: 1.5em; font-weight: bold; color: green; }
+    #espera { display: none; color: blue; margin-top: 1em; }
+  </style>
+</head>
+<body>
+  <h1>Checador OEMASC</h1>
+
+  <input type="text" id="rfc" placeholder="Ingresa tu RFC" maxlength="10" pattern="[A-Z]{4}[0-9]{6}" title="Formato: ABCD900101" />
+  <br>
+  <button id="botonChecar" onclick="checar()">Checar asistencia</button>
+
+  <div id="espera">Procesando registro... Por favor espera.</div>
+  <div id="mensaje"></div>
+
+  <script>
+    let ultimoChecado = 0;
+
+    async function obtenerIP() {
+      try {
+        const respuesta = await fetch("https://api.ipify.org?format=json");
+        const data = await respuesta.json();
+        return data.ip;
+      } catch (error) {
+        console.error("No se pudo obtener la IP:", error);
+        return null;
+      }
+    }
+
+    async function checar() {
+      const ahora = Date.now();
+      if (ahora - ultimoChecado < 30000) {
+        alert("Por favor espera al menos 30 segundos entre registros.");
+        return;
+      }
+
+      const rfcInput = document.getElementById("rfc");
+      const rfc = rfcInput.value.trim().toUpperCase();
+      const mensajeDiv = document.getElementById("mensaje");
+      const esperaDiv = document.getElementById("espera");
+      const boton = document.getElementById("botonChecar");
+
+      mensajeDiv.textContent = "";
+      esperaDiv.style.display = "block";
+      boton.disabled = true;
+
+      const rfcValido = /^[A-Z]{4}[0-9]{6}$/.test(rfc);
+      if (!rfcValido) {
+        esperaDiv.style.display = "none";
+        boton.disabled = false;
+        alert("Por favor, ingresa un RFC válido (formato: ABCD900101).");
+        return;
+      }
+
+      const ip = await obtenerIP();
+
+      if (!ip || !ip.startsWith("201.98.")) {
+        esperaDiv.style.display = "none";
+        boton.disabled = false;
+        mensajeDiv.style.color = "orange";
+        mensajeDiv.textContent = "Tu registro no pudo ser procesado en este momento. Intenta desde una red autorizada.";
+        return;
+      }
+
+      try {
+        const respuesta = await fetch("https://script.google.com/macros/s/AKfycbxEVQFbvcu6gjbbFB5TJG0w_fbg4n7PAKP-VMbMgNdqS84pGD-_p1xd14KkjYyu45Vw/exec", {
+          method: "POST",
+          body: new URLSearchParams({ rfc, ip })
+        });
+
+        const texto = await respuesta.text();
+        mensajeDiv.style.color = "green";
+        mensajeDiv.textContent = texto;
+        rfcInput.value = "";
+        rfcInput.focus();
+        ultimoChecado = Date.now();
+      } catch (error) {
+        console.error("Error al enviar los datos:", error);
+        mensajeDiv.style.color = "red";
+        mensajeDiv.textContent = "No se pudo registrar. Verifica tu conexión.";
+      } finally {
+        esperaDiv.style.display = "none";
+        boton.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>
+
